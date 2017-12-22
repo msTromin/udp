@@ -1,16 +1,8 @@
 ﻿/*
-
   -----------------------
   UDP-Send
   -----------------------
-  // [url]http://msdn.microsoft.com/de-de/library/bb979228.aspx#ID0E3BAC[/url]
-
-  // > gesendetes unter
-  // 127.0.0.1 : 8050 empfangen
-
-  // nc -lu 127.0.0.1 8050
-
-  // todo: shutdown thread at the end
+  // [url]http://msdn.microsoft.com/de-de/library/bb979228.aspx#ID0E3BAC[/url]  
 */
 using UnityEngine;
 using System.Collections;
@@ -20,25 +12,26 @@ using System.Text;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
-
+/*
+ * simple udp implementation (send/read)
+ */
 public class udpSend : MonoBehaviour
 {
-    private static int localPort;
-
+    protected static udpSend Self = null;
+    protected udpEventJson jsonData;//temp
     // prefs
-    private string IP;  // define in init
-    public int port;  // define in init
-
+    public string szIP = "127.0.0.1";  // define in init
+    public int iPort = 8051;  // define in init    
     // "connection" things
     IPEndPoint remoteEndPoint;
     UdpClient client;
-
-    // gui
-    string strMessage = "";
-
+    // 
+    protected string strMessage = "";
     // Use this for initialization
     void Start ()
     {
+        if (Self == null) Self = this;
+        jsonData = new udpEventJson();
         init();
     }
 	
@@ -47,119 +40,100 @@ public class udpSend : MonoBehaviour
     {
 		
 	}
-    
-    // call it from shell (as program)
-    private static void Main()
+
+    //Instance
+    public static udpSend Instance()
     {
-        udpSend sendObj = new udpSend();
-        sendObj.init();
-
-        // testing via console
-        // sendObj.inputFromConsole();
-
-        // as server sending endless
-        sendObj.sendEndless(" endless infos \n");
-
+        return Self;
     }
-
-    // OnGUI
-    void OnGUI()
+    //Creating property
+    public string IP
     {
-        Rect rectObj = new Rect(40, 380, 200, 400);
-        GUIStyle style = new GUIStyle();
-        style.fontSize = 28;
-        style.alignment = TextAnchor.UpperLeft;
-        GUI.Box(rectObj, "# UDPSend-Data\n127.0.0.1 " + port + " #\n" + "shell> nc -lu 127.0.0.1  " + port + " \n" , style);
-
-        // ------------------------
-        // send it
-        // ------------------------
-        strMessage = GUI.TextField(new Rect(40, 480, 140, 40), strMessage);
-        if (GUI.Button(new Rect(190, 480, 100, 40), "send"))
+        get //get method for returning value
         {
-            sendString(strMessage + "\n");
+            return szIP;
+        }
+        set // set method for storing value
+        {
+            szIP = value;
+
         }
     }
-
+    public int Port
+    {
+        get //get method for returning value
+        {
+            return iPort;
+        }
+        set // set method for storing value
+        { 
+            iPort = value;
+        }
+    }
     // init
     public void init()
     {
-        // Endpunkt definieren, von dem die Nachrichten gesendet werden.
-        print("UDPSend.init()");
-
-        // define
-        IP = "127.0.0.1";
-        port = 8051;
-
         // ----------------------------
-        // Senden
+        // 發送
         // ----------------------------
-        remoteEndPoint = new IPEndPoint(IPAddress.Parse(IP), port);
+        remoteEndPoint = new IPEndPoint(IPAddress.Parse(szIP), iPort);
         client = new UdpClient();
 
         // status
-        print("Sending to " + IP + " : " + port);
-        print("Testing: nc -lu " + IP + " : " + port);
-    }
-
-    // inputFromConsole
-    private void inputFromConsole()
-    {
-        try
-        {
-            string text;
-            do
-            {
-                text = Console.ReadLine();
-
-                // Den Text zum Remote-Client senden.
-                if (text != "")
-                {
-
-                    // Daten mit der UTF8-Kodierung in das Binärformat kodieren.
-                    byte[] data = Encoding.UTF8.GetBytes(text);
-
-                    // Den Text zum Remote-Client senden.
-                    client.Send(data, data.Length, remoteEndPoint);
-                }
-            } while (text != "");
-        }
-        catch (Exception err)
-        {
-            print(err.ToString());
-        }
-
-    }
+        Debug.Log("Sending to " + IP + " : " + Port);
+    }   
 
     // sendData
     private void sendString(string message)
     {
         try
         {
-            //if (message != "")
-            //{
-
-            // Daten mit der UTF8-Kodierung in das Binärformat kodieren.
+            //用UTF8編碼將數據編碼為二進制格式。
             byte[] data = Encoding.UTF8.GetBytes(message);
 
-            // Den message zum Remote-Client senden.
+            //將消息發送到遠程客戶端。
             client.Send(data, data.Length, remoteEndPoint);
-            //}
         }
         catch (Exception err)
         {
-            print(err.ToString());
+            Debug.Log(err.ToString());
         }
     }
-
-
-    // endless test
-    private void sendEndless(string testStr)
+    //
+    public void SendStartMessage()
     {
-        do
-        {
-            sendString(testStr);
-        }
-        while (true);
+        DateTime currentDate = DateTime.Now;
+        String sFileDate = currentDate.ToString("yyyy-MM-dd-HH-mm-ss");
+        jsonData.eventType = (int)EventStatus.EVENT_START;
+        jsonData.eventData = "Start Event " + sFileDate ;
+        string jsonString = JsonUtility.ToJson(jsonData);
+        sendString(jsonString);
+    }
+    public void SendEndMessage()
+    {
+        DateTime currentDate = DateTime.Now;
+        String sFileDate = currentDate.ToString("yyyy-MM-dd-HH-mm-ss");
+        jsonData.eventType = (int)EventStatus.EVENT_END;
+        jsonData.eventData = "End Event " + sFileDate;
+        string jsonString = JsonUtility.ToJson(jsonData);
+        sendString(jsonString);
     }
 }
+
+/*
+ *  simple event date for udp send , json format
+ */
+enum EventStatus
+{
+    EVENT_READY = 0, // 準備
+    EVENT_START = 1, // 開始
+    EVENT_END   = 2  // 結束
+}
+
+[System.Serializable]
+public class udpEventJson
+{
+    public int eventType;
+    public string eventData;
+}
+
